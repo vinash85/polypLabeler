@@ -1,0 +1,14 @@
+[
+  {
+    "image": "image1.jpg",
+    "question": "What do you see in this image?",
+    "options": ["Tree", "Car", "Building", "Animal"],
+    "correct": "Tree"
+  },
+  {
+    "image": "image2.jpg",
+    "question": "What color dominates this image?",
+    "options": ["Red", "Blue", "Green", "Yellow"],
+    "correct": "Blue"
+  }
+]
