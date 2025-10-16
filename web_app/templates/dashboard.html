@@ -22,8 +22,14 @@
             <img id="image" src="" alt="Press Load button and Images with questions will appear" width="800">
             <div>
                 <p id="progress-display"></p>
-                <p id="question"></p>
-                <form id="options"></form>
+                <div id="q1">
+                	<p id="question1"></p>
+                	<form id="options1"></form>
+                </div>
+                <div id="q2" style="margin-top: 16px;">
+                	<p id="question2"></p>
+                	<form id="options2"></form>
+                </div>
                 <button id="submitBtn" onclick="submitAnswer()" class="styled-button">Submit Answer</button>
                 <button id="changeAnswerBtn" onclick="changeAnswer()" class="styled-button">Change Answer</button>
             </div>
@@ -66,35 +72,48 @@
                 .then(data => {
                     document.getElementById("progress-display").innerText = `You are answering: ${data.progress + 1} out of ${totalQuestions}`;
                     document.getElementById("image").src = data.image;
-                    document.getElementById("question").innerText = data.question;
+                    document.getElementById("question1").innerText = data.q1.question || "";
+                    document.getElementById("question2").innerText = data.q2.question || "";
                     currentImageName = data.image.split('/').pop();
                     
-                    const optionsForm = document.getElementById("options");
-                    optionsForm.innerHTML = '';
-                    data.options.forEach(option => {
+                    const optionsForm1 = document.getElementById("options1");
+                    const optionsForm2 = document.getElementById("options2");
+                    optionsForm1.innerHTML = '';
+                    optionsForm2.innerHTML = '';
+                    (data.q1.options || []).forEach(option => {
                         const label = document.createElement('label');
-                        label.innerHTML = `<input type="radio" name="answer" value="${option}"> ${option}`;
-                        optionsForm.appendChild(label);
-                        //optionsForm.appendChild(document.createElement('br'));
+                        label.innerHTML = `<input type="radio" name="answer1" value="${option}"> ${option}`;
+                        optionsForm1.appendChild(label);
+                    });
+                    (data.q2.options || []).forEach(option => {
+                        const label = document.createElement('label');
+                        label.innerHTML = `<input type="radio" name="answer2" value="${option}"> ${option}`;
+                        optionsForm2.appendChild(label);
                     });
                     
                     if (answeredQuestions.has(currentImageName)) {
                         fetch(`/api/get_user_answer/${currentImageName}`)
                             .then(res => res.json())
                             .then(answerData => {
-                                if (answerData.answer) {
-                                    const radio = document.querySelector(`input[name="answer"][value="${answerData.answer}"]`);
-                                    if (radio) {
-                                        radio.checked = true;
+                                if (answerData.answer1) {
+                                    const r1 = document.querySelector(`input[name="answer1"][value="${answerData.answer1}"]`);
+                                    if (r1) {
+                                        r1.checked = true;
+                                    }
+                                }
+                                if (answerData.answer2) {
+                                    const r2 = document.querySelector(`input[name="answer2"][value="${answerData.answer2}"]`);
+                                    if (r2) {
+                                        r2.checked = true;
                                     }
                                 }
                                 
-                                document.getElementById("options").disabled = true;
+                                disableOptions(true);
                                 document.getElementById("submitBtn").style.display = 'none';
                                 document.getElementById("changeAnswerBtn").style.display = 'block';
                             });
                     } else {
-                        document.getElementById("options").disabled = false;
+                        disableOptions(false);
                         document.getElementById("submitBtn").style.display = 'block';
                         document.getElementById("changeAnswerBtn").style.display = 'none';
                         document.getElementById("submitBtn").disabled = false;
@@ -117,19 +136,22 @@
         }
 
         function submitAnswer() {
-            const selected = document.querySelector('input[name="answer"]:checked');
-            if (!selected) {
-                alert('Please select an answer.');
+            const selected1 = document.querySelector('input[name="answer1"]:checked');
+            const selected2 = document.querySelector('input[name="answer2"]:checked');
+            if (!selected1 && !selected2) {
+                alert('Please select at least one answer.');
                 return;
             }
 
-            const answer = selected.value;
+            const answer1 = selected1 ? selected1.value : null;
+            const answer2 = selected2 ? selected2.value : null;
 
             fetch("/api/submit_answer", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
-                    answer: answer,
+                    answer1: answer1,
+                    answer2: answer2,
                     image_name: currentImageName
                 })
             }).then(res => res.json())
@@ -144,7 +166,7 @@
         }
 
         function changeAnswer() {
-            document.getElementById("options").disabled = false;
+            disableOptions(false);
             document.getElementById("changeAnswerBtn").style.display = 'none';
             document.getElementById("submitBtn").style.display = 'block';
             document.getElementById("submitBtn").innerText = "Update Answer";
@@ -152,25 +174,24 @@
         }
 
         function updateAnswer() {
-            const selected = document.querySelector('input[name="answer"]:checked');
-            if (!selected) {
-                alert('Please select a new answer.');
-                return;
-            }
-            const newAnswer = selected.value;
+            const selected1 = document.querySelector('input[name="answer1"]:checked');
+            const selected2 = document.querySelector('input[name="answer2"]:checked');
+            const newAnswer1 = selected1 ? selected1.value : null;
+            const newAnswer2 = selected2 ? selected2.value : null;
             
             fetch("/api/change_answer", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     image_name: currentImageName,
-                    new_answer: newAnswer
+                    new_answer1: newAnswer1,
+                    new_answer2: newAnswer2
                 })
             }).then(res => res.json())
               .then(data => {
                   if (data.status === "success") {
                       alert("Answer updated successfully!");
-                      document.getElementById("options").disabled = true;
+                      disableOptions(true);
                       document.getElementById("submitBtn").style.display = 'none';
                       document.getElementById("changeAnswerBtn").style.display = 'block';
                       document.getElementById("submitBtn").innerText = "Submit Answer";
@@ -179,6 +200,12 @@
                       alert("Error updating answer.");
                   }
               });
+        }
+
+        function disableOptions(disabled) {
+            document.querySelectorAll('#options1 input, #options2 input').forEach(el => {
+                el.disabled = disabled;
+            });
         }
         
         loadAnsweredQuestions();
