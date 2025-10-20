@@ -97,14 +97,15 @@ def get_item(progress):
     
     data = questions[progress]
     image = data["image"]
-    question = data["question"]
-    options = data["options"]
+    qs = data.get("questions", [])
+    q1 = qs[0] if len(qs) > 0 else {"question": None, "options": []}
+    q2 = qs[1] if len(qs) > 1 else {"question": None, "options": []}
     
     return jsonify({
         "image": url_for('static', filename="images/" + image),
-        "question": question,
         "progress": progress,
-        "options": options
+        "q1": q1,
+        "q2": q2
     })
 
 # New API endpoint to check if a question has been answered
@@ -128,11 +129,12 @@ def get_answered_questions():
 @login_required
 def submit_answer():
     data = request.json
-    answer = data.get("answer")
     image_name = data.get("image_name")
+    answer1 = data.get("answer1")
+    answer2 = data.get("answer2")
     
-    if not answer or not image_name:
-        return jsonify({"status": "error", "message": "Missing answer or image name"}), 400
+    if not image_name or (answer1 is None and answer2 is None):
+        return jsonify({"status": "error", "message": "Missing image name or answers"}), 400
         
     username = current_user.username
     csv_file_path = f"answers/{username}_answers.csv"
@@ -146,8 +148,8 @@ def submit_answer():
     with open(csv_file_path, "a", newline="") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["image_name", "answer"])
-        writer.writerow([image_name, answer])
+            writer.writerow(["image_name", "answer1", "answer2"])
+        writer.writerow([image_name, answer1 or "", answer2 or ""]) 
 
     # Now, save the progress as before
     current_user.progress = current_user.progress + 1
@@ -166,8 +168,10 @@ def get_user_answer(image_name):
             reader = csv.reader(f)
             next(reader, None)  # Skip the header row
             for row in reader:
-                if row and len(row) > 1 and row[0] == image_name:
-                    return jsonify({"answer": row[1]})
+                if row and len(row) > 0 and row[0] == image_name:
+                    if len(row) == 2:
+                        return jsonify({"answer1": row[1], "answer2": None})
+                    return jsonify({"answer1": row[1] if len(row) > 1 else None, "answer2": row[2] if len(row) > 2 else None})
     
     return jsonify({"answer": None})
 
@@ -176,10 +180,11 @@ def get_user_answer(image_name):
 def change_answer():
     data = request.json
     image_name = data.get("image_name")
-    new_answer = data.get("new_answer")
+    new_answer1 = data.get("new_answer1")
+    new_answer2 = data.get("new_answer2")
     
-    if not image_name or not new_answer:
-        return jsonify({"status": "error", "message": "Missing image name or new answer"}), 400
+    if not image_name:
+        return jsonify({"status": "error", "message": "Missing image name"}), 400
     
     username = current_user.username
     csv_file_path = f"answers/{username}_answers.csv"
@@ -200,7 +205,10 @@ def change_answer():
         
         for row in reader:
             if row and len(row) > 0 and row[0] == image_name:
-                writer.writerow([image_name, new_answer])
+                if len(row) >= 3:
+                    writer.writerow([image_name, new_answer1 if new_answer1 is not None else row[1], new_answer2 if new_answer2 is not None else row[2]])
+                else:
+                    writer.writerow([image_name, new_answer1 if new_answer1 is not None else (row[1] if len(row) > 1 else ""), new_answer2 if new_answer2 is not None else ""]) 
                 found = True
             else:
                 writer.writerow(row)
